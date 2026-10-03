@@ -33,10 +33,16 @@ def detect_delimiter(line):
     return ","
 
 
-def read_csv(path):
-    """读入 CSV，返回表头和数据行。空行和 # 开头的注释行会被丢掉。"""
+def read_csv(path, skip=0):
+    """读入 CSV，返回表头和数据行。空行和 # 开头的注释行会被丢掉。
+
+    skip 用来跳过文件开头的若干行，仪器导出的文件前面常有说明文字。
+    """
     with path.open("r", encoding="utf-8-sig", newline="") as f:
-        lines = [ln for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+        raw = f.readlines()
+    lines = [
+        ln for ln in raw[skip:] if ln.strip() and not ln.lstrip().startswith("#")
+    ]
     if not lines:
         raise SystemExit(f"{path} 里没有有效数据")
     reader = csv.reader(lines, delimiter=detect_delimiter(lines[0]))
@@ -99,6 +105,12 @@ def main():
     ap.add_argument("--ylabel", default=None, help="纵轴名称")
     ap.add_argument("--out", type=Path, default=None, help="输出图片路径")
     ap.add_argument(
+        "--skip",
+        type=int,
+        default=0,
+        help="跳过文件开头的 N 行，用于仪器导出文件前的说明文字",
+    )
+    ap.add_argument(
         "--fit",
         choices=["none", "linear"],
         default="none",
@@ -110,7 +122,7 @@ def main():
     if not args.csv.exists():
         raise SystemExit(f"找不到文件：{args.csv}")
 
-    header, rows = read_csv(args.csv)
+    header, rows = read_csv(args.csv, skip=args.skip)
     xi = pick_column(header, args.x)
     yi = pick_column(header, args.y)
     xs, ys, skipped = to_pairs(rows, xi, yi)
